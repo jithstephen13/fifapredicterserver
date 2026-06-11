@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Local env files (contain database credentials)
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# Production builds
+dist/
+build/
+out/
+
+# IDE and OS files
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
