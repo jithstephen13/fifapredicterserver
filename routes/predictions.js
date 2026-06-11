@@ -13,6 +13,7 @@ router.post('/', async (req, res) => {
     upiId,
     predictedScoreA,
     predictedScoreB,
+    entryAmount,
     transactionId
   } = req.body;
 
@@ -24,9 +25,16 @@ router.post('/', async (req, res) => {
     !upiId ||
     predictedScoreA === undefined ||
     predictedScoreB === undefined ||
+    entryAmount === undefined ||
     !transactionId
   ) {
     return res.status(400).json({ error: 'All fields are required.' });
+  }
+
+  // Validate entry amount
+  const numericEntryAmount = parseInt(entryAmount);
+  if (isNaN(numericEntryAmount) || numericEntryAmount < 20 || numericEntryAmount > 100) {
+    return res.status(400).json({ error: 'Entry fee must be a number between ₹20 and ₹100.' });
   }
 
   // Validate UTR format (UPI Transaction IDs are typically 12-digit numbers in India)
@@ -68,6 +76,7 @@ router.post('/', async (req, res) => {
       upiId: upiId.trim(),
       predictedScoreA: parseInt(predictedScoreA),
       predictedScoreB: parseInt(predictedScoreB),
+      entryAmount: numericEntryAmount,
       transactionId: cleanTransactionId,
       paymentStatus: 'pending'
     });
@@ -121,13 +130,14 @@ router.get('/winners', async (req, res) => {
         phoneNumber: maskedPhone,
         predictedScoreA: w.predictedScoreA,
         predictedScoreB: w.predictedScoreB,
+        entryAmount: w.entryAmount || 20,
+        prizeAmount: (w.entryAmount || 20) * 3,
         matchId: {
           teamA: w.matchId.teamA,
           teamALogo: w.matchId.teamALogo,
           teamB: w.matchId.teamB,
           teamBLogo: w.matchId.teamBLogo,
-          result: w.matchId.result,
-          prizeAmount: w.matchId.prizeAmount
+          result: w.matchId.result
         },
         createdAt: w.createdAt
       };

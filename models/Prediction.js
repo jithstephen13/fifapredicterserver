@@ -7,6 +7,7 @@ const predictionSchema = new mongoose.Schema({
   upiId: { type: String, required: true },
   predictedScoreA: { type: Number, required: true },
   predictedScoreB: { type: Number, required: true },
+  entryAmount: { type: Number, required: true },
   transactionId: { type: String, required: true, unique: true }, // UPI UTR reference number
   paymentStatus: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },
   isWinner: { type: Boolean, default: false },
