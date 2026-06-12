@@ -119,6 +119,15 @@ router.get('/winners', async (req, res) => {
     
     const publicWinners = winners.map(w => {
       if (!w.matchId) return null;
+
+      // Ensure the predicted score matches the actual match result
+      if (
+        w.predictedScoreA !== w.matchId.result.scoreA ||
+        w.predictedScoreB !== w.matchId.result.scoreB
+      ) {
+        return null;
+      }
+
       const phone = w.phoneNumber || '';
       const maskedPhone = phone.length >= 10 
         ? `${phone.substring(0, 3)}****${phone.substring(phone.length - 3)}`
@@ -133,6 +142,7 @@ router.get('/winners', async (req, res) => {
         entryAmount: w.entryAmount || 20,
         prizeAmount: (w.entryAmount || 20) * 3,
         matchId: {
+          _id: w.matchId._id,
           teamA: w.matchId.teamA,
           teamALogo: w.matchId.teamALogo,
           teamB: w.matchId.teamB,
