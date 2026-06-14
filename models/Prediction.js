@@ -5,8 +5,10 @@ const predictionSchema = new mongoose.Schema({
   userName: { type: String, required: true },
   phoneNumber: { type: String, required: true },
   upiId: { type: String, required: true },
-  predictedScoreA: { type: Number, required: true },
-  predictedScoreB: { type: Number, required: true },
+  predictedScoreA: { type: Number },
+  predictedScoreB: { type: Number },
+  predictionType: { type: String, enum: ['winningTeam', 'score'], required: true, default: 'score' },
+  predictedWinner: { type: String, enum: ['teamA', 'teamB', 'draw'] },
   entryAmount: { type: Number, required: true },
   transactionId: { type: String, required: true, unique: true }, // UPI UTR reference number
   paymentStatus: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },

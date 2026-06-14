@@ -104,11 +104,32 @@ router.post('/:id/complete', authenticateAdmin, async (req, res) => {
 
     await match.save();
 
-    // Find all predictions that matched the exact score
+    // Compute actual winner
+    let actualWinner;
+    const sA = parseInt(scoreA);
+    const sB = parseInt(scoreB);
+    if (sA > sB) {
+      actualWinner = 'teamA';
+    } else if (sA < sB) {
+      actualWinner = 'teamB';
+    } else {
+      actualWinner = 'draw';
+    }
+
+    // Find all predictions that are correct (exact score or winning team match)
     const exactPredictions = await Prediction.find({
       matchId: match._id,
-      predictedScoreA: match.result.scoreA,
-      predictedScoreB: match.result.scoreB
+      $or: [
+        {
+          predictionType: { $ne: 'winningTeam' }, // Defaults to 'score'
+          predictedScoreA: sA,
+          predictedScoreB: sB
+        },
+        {
+          predictionType: 'winningTeam',
+          predictedWinner: actualWinner
+        }
+      ]
     });
 
     res.json({

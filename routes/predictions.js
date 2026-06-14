@@ -11,6 +11,8 @@ router.post('/', async (req, res) => {
     userName,
     phoneNumber,
     upiId,
+    predictionType,
+    predictedWinner,
     predictedScoreA,
     predictedScoreB,
     entryAmount,
@@ -23,18 +25,41 @@ router.post('/', async (req, res) => {
     !userName ||
     !phoneNumber ||
     !upiId ||
-    predictedScoreA === undefined ||
-    predictedScoreB === undefined ||
     entryAmount === undefined ||
     !transactionId
   ) {
     return res.status(400).json({ error: 'All fields are required.' });
   }
 
+  const predType = predictionType || 'score';
+  if (!['winningTeam', 'score'].includes(predType)) {
+    return res.status(400).json({ error: 'Invalid prediction type.' });
+  }
+
+  if (predType === 'winningTeam') {
+    if (!predictedWinner || !['teamA', 'teamB', 'draw'].includes(predictedWinner)) {
+      return res.status(400).json({ error: 'Winning team prediction is required.' });
+    }
+  } else {
+    if (predictedScoreA === undefined || predictedScoreB === undefined) {
+      return res.status(400).json({ error: 'Predicted score is required.' });
+    }
+  }
+
   // Validate entry amount
   const numericEntryAmount = parseInt(entryAmount);
-  if (isNaN(numericEntryAmount) || numericEntryAmount < 20 || numericEntryAmount > 100) {
-    return res.status(400).json({ error: 'Entry fee must be a number between ₹20 and ₹100.' });
+  if (isNaN(numericEntryAmount)) {
+    return res.status(400).json({ error: 'Entry fee must be a number.' });
+  }
+
+  if (predType === 'winningTeam') {
+    if (numericEntryAmount < 20 || numericEntryAmount > 100) {
+      return res.status(400).json({ error: 'Entry fee for winning team prediction must be between ₹20 and ₹100.' });
+    }
+  } else {
+    if (numericEntryAmount < 100 || numericEntryAmount > 300) {
+      return res.status(400).json({ error: 'Entry fee for score prediction must be between ₹100 and ₹300.' });
+    }
   }
 
   // Validate UTR format (UPI Transaction IDs are typically 12-digit numbers in India)
@@ -60,8 +85,6 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Predictions are closed as the match has already started.' });
     }
 
-
-
     // Check if transaction ID has already been used
     const duplicateTx = await Prediction.findOne({ transactionId: cleanTransactionId });
     if (duplicateTx) {
@@ -69,17 +92,25 @@ router.post('/', async (req, res) => {
     }
 
     // Create the prediction
-    const prediction = new Prediction({
+    const predictionData = {
       matchId,
       userName: userName.trim(),
       phoneNumber: phoneNumber.trim(),
       upiId: upiId.trim(),
-      predictedScoreA: parseInt(predictedScoreA),
-      predictedScoreB: parseInt(predictedScoreB),
+      predictionType: predType,
       entryAmount: numericEntryAmount,
       transactionId: cleanTransactionId,
       paymentStatus: 'pending'
-    });
+    };
+
+    if (predType === 'winningTeam') {
+      predictionData.predictedWinner = predictedWinner;
+    } else {
+      predictionData.predictedScoreA = parseInt(predictedScoreA);
+      predictionData.predictedScoreB = parseInt(predictedScoreB);
+    }
+
+    const prediction = new Prediction(predictionData);
 
     await prediction.save();
     res.status(201).json({
@@ -120,12 +151,31 @@ router.get('/winners', async (req, res) => {
     const publicWinners = winners.map(w => {
       if (!w.matchId) return null;
 
-      // Ensure the predicted score matches the actual match result
-      if (
-        w.predictedScoreA !== w.matchId.result.scoreA ||
-        w.predictedScoreB !== w.matchId.result.scoreB
-      ) {
-        return null;
+      const predType = w.predictionType || 'score';
+
+      if (predType === 'winningTeam') {
+        let actualWinner;
+        const scoreA = w.matchId.result.scoreA;
+        const scoreB = w.matchId.result.scoreB;
+        if (scoreA > scoreB) {
+          actualWinner = 'teamA';
+        } else if (scoreA < scoreB) {
+          actualWinner = 'teamB';
+        } else {
+          actualWinner = 'draw';
+        }
+
+        if (w.predictedWinner !== actualWinner) {
+          return null;
+        }
+      } else {
+        // Ensure the predicted score matches the actual match result
+        if (
+          w.predictedScoreA !== w.matchId.result.scoreA ||
+          w.predictedScoreB !== w.matchId.result.scoreB
+        ) {
+          return null;
+        }
       }
 
       const phone = w.phoneNumber || '';
@@ -137,10 +187,12 @@ router.get('/winners', async (req, res) => {
         _id: w._id,
         userName: w.userName,
         phoneNumber: maskedPhone,
+        predictionType: predType,
+        predictedWinner: w.predictedWinner,
         predictedScoreA: w.predictedScoreA,
         predictedScoreB: w.predictedScoreB,
         entryAmount: w.entryAmount || 20,
-        prizeAmount: (w.entryAmount || 20) * 3,
+        prizeAmount: predType === 'winningTeam' ? (w.entryAmount || 20) * 2 : (w.entryAmount || 20) * 3,
         matchId: {
           _id: w.matchId._id,
           teamA: w.matchId.teamA,
