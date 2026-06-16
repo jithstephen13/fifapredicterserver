@@ -13,6 +13,9 @@ const predictionSchema = new mongoose.Schema({
   transactionId: { type: String, required: true, unique: true }, // UPI UTR reference number
   paymentStatus: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },
   isWinner: { type: Boolean, default: false },
+  referralCode: { type: String },
+  referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'ReferralUser' },
+  referralApplied: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });
 

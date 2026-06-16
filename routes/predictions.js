@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const Prediction = require('../models/Prediction');
 const Match = require('../models/Match');
+const ReferralUser = require('../models/ReferralUser');
+const ReferralRelationship = require('../models/ReferralRelationship');
+const ReferralReward = require('../models/ReferralReward');
 const { authenticateAdmin } = require('./auth');
 
 // Submit a new prediction
@@ -16,7 +19,8 @@ router.post('/', async (req, res) => {
     predictedScoreA,
     predictedScoreB,
     entryAmount,
-    transactionId
+    transactionId,
+    referralCode
   } = req.body;
 
   // Validate request body
@@ -53,8 +57,8 @@ router.post('/', async (req, res) => {
   }
 
   if (predType === 'winningTeam') {
-    if (numericEntryAmount < 20 || numericEntryAmount > 100) {
-      return res.status(400).json({ error: 'Entry fee for winning team prediction must be between ₹20 and ₹100.' });
+    if (numericEntryAmount < 20 || numericEntryAmount > 40) {
+      return res.status(400).json({ error: 'Entry fee for winning team prediction must be between ₹20 and ₹40.' });
     }
   } else {
     if (numericEntryAmount < 100 || numericEntryAmount > 300) {
@@ -91,6 +95,43 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'This UPI UTR / Transaction ID has already been submitted.' });
     }
 
+    let referralApplied = false;
+    let referredBy = undefined;
+
+    if (referralCode && referralCode.trim()) {
+      const cleanRefCode = referralCode.trim();
+      const referralOwner = await ReferralUser.findOne({ referralCode: cleanRefCode });
+      if (!referralOwner) {
+        return res.status(400).json({ error: 'Invalid referral code.' });
+      }
+
+      // Rule 1: Self referral check
+      if (phoneNumber.trim() === referralOwner.phoneNumber || upiId.trim() === referralOwner.upiId) {
+        referralApplied = false;
+      } else {
+        // Rule 2: Valid and belongs to another user
+        // Find or create relationship
+        let relationship = await ReferralRelationship.findOne({
+          referrerId: referralOwner._id,
+          referredPhoneNumber: phoneNumber.trim()
+        });
+
+        if (!relationship) {
+          relationship = new ReferralRelationship({
+            referralCode: cleanRefCode,
+            referrerId: referralOwner._id,
+            referredPhoneNumber: phoneNumber.trim(),
+            referredUpiId: upiId.trim(),
+            createdAt: new Date()
+          });
+          await relationship.save();
+        }
+
+        referralApplied = true;
+        referredBy = referralOwner._id;
+      }
+    }
+
     // Create the prediction
     const predictionData = {
       matchId,
@@ -100,7 +141,10 @@ router.post('/', async (req, res) => {
       predictionType: predType,
       entryAmount: numericEntryAmount,
       transactionId: cleanTransactionId,
-      paymentStatus: 'pending'
+      paymentStatus: 'pending',
+      referralCode: referralCode ? referralCode.trim() : undefined,
+      referredBy,
+      referralApplied
     };
 
     if (predType === 'winningTeam') {
@@ -260,6 +304,10 @@ router.put('/:id/payment', authenticateAdmin, async (req, res) => {
     prediction.paymentStatus = paymentStatus;
     await prediction.save();
 
+    if (paymentStatus === 'verified' && prediction.referralApplied && prediction.referredBy) {
+      await evaluateReferralRewards(prediction);
+    }
+
     res.json({
       message: `Payment status updated to ${paymentStatus}.`,
       prediction
@@ -268,5 +316,86 @@ router.put('/:id/payment', authenticateAdmin, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+async function evaluateReferralRewards(prediction) {
+  try {
+    const { referredBy, phoneNumber, predictionType } = prediction;
+    if (!referredBy || !phoneNumber) return;
+
+    // 1. Find referral relationship
+    const relationship = await ReferralRelationship.findOne({
+      referrerId: referredBy,
+      referredPhoneNumber: phoneNumber
+    });
+
+    if (!relationship) {
+      console.warn(`Referral relationship not found for referrer ${referredBy} and phone ${phoneNumber}`);
+      return;
+    }
+
+    // 2. Count verified predictions of the specific type for this referred user
+    const verifiedCount = await Prediction.countDocuments({
+      referredBy,
+      phoneNumber,
+      predictionType,
+      paymentStatus: 'verified'
+    });
+
+    // 3. Check thresholds & Create reward if eligible
+    if (predictionType === 'winningTeam') {
+      if (verifiedCount >= 5) {
+        // Check if reward already exists to prevent duplicates
+        const existingReward = await ReferralReward.findOne({
+          referralRelationshipId: relationship._id,
+          rewardType: 'winningTeamReward'
+        });
+
+        if (!existingReward) {
+          const reward = new ReferralReward({
+            referrerId: referredBy,
+            referralRelationshipId: relationship._id,
+            rewardType: 'winningTeamReward',
+            amount: 50,
+            status: 'eligible',
+            createdAt: new Date()
+          });
+          await reward.save();
+
+          // Update ReferralUser's totalEarned
+          await ReferralUser.findByIdAndUpdate(referredBy, {
+            $inc: { totalEarned: 50 }
+          });
+        }
+      }
+    } else if (predictionType === 'score') {
+      if (verifiedCount >= 3) {
+        // Check if reward already exists to prevent duplicates
+        const existingReward = await ReferralReward.findOne({
+          referralRelationshipId: relationship._id,
+          rewardType: 'scoreReward'
+        });
+
+        if (!existingReward) {
+          const reward = new ReferralReward({
+            referrerId: referredBy,
+            referralRelationshipId: relationship._id,
+            rewardType: 'scoreReward',
+            amount: 100,
+            status: 'eligible',
+            createdAt: new Date()
+          });
+          await reward.save();
+
+          // Update ReferralUser's totalEarned
+          await ReferralUser.findByIdAndUpdate(referredBy, {
+            $inc: { totalEarned: 100 }
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error in evaluateReferralRewards:', error);
+  }
+}
 
 module.exports = router;

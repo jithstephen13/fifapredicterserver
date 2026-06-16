@@ -6,6 +6,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth').router;
 const matchRoutes = require('./routes/matches');
 const predictionRoutes = require('./routes/predictions');
+const referralRoutes = require('./routes/referrals');
 const Match = require('./models/Match');
 const matchesData = require('./matchesData');
 
@@ -19,6 +20,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/predictions', predictionRoutes);
+app.use('/api/referrals', referralRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
