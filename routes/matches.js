@@ -132,11 +132,19 @@ router.post('/:id/complete', authenticateAdmin, async (req, res) => {
       ]
     });
 
+    const eligiblePredictions = [];
+    for (const pred of exactPredictions) {
+      const isEligible = await checkGroupEligibility(pred);
+      if (isEligible) {
+        eligiblePredictions.push(pred);
+      }
+    }
+
     res.json({
       message: 'Match marked as completed',
       match,
-      exactPredictionsCount: exactPredictions.length,
-      exactPredictions // Send predictions list to the client so admin can verify who paid and pick winners
+      exactPredictionsCount: eligiblePredictions.length,
+      exactPredictions: eligiblePredictions // Send predictions list to the client so admin can verify who paid and pick winners
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -161,12 +169,43 @@ router.post('/:id/winners', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Match must be completed before picking winners' });
     }
 
-    // Reset previous winners for this match
-    await Prediction.updateMany({ matchId: match._id }, { $set: { isWinner: false } });
+    // Find all predictions currently selected as winners
+    const selectedPredictions = await Prediction.find({ _id: { $in: predictionIds } });
 
-    // Mark the new selected predictions as winners
+    // Build the set of all prediction IDs that should be set as winners
+    const allWinnerIds = new Set();
+    for (const p of selectedPredictions) {
+      if (p.predictionType === 'winningTeam' && p.transactionId.includes('_')) {
+        const baseTx = p.transactionId.split('_')[0];
+        const group = await Prediction.find({
+          transactionId: { $regex: new RegExp('^' + baseTx + '_') }
+        });
+        group.forEach(g => allWinnerIds.add(g._id.toString()));
+      } else {
+        allWinnerIds.add(p._id.toString());
+      }
+    }
+
+    // Reset previous winners:
+    // Any prediction for this match that was marked as winner needs to be reset.
+    // If it was a winningTeam day-wise prediction, we must reset the whole day group!
+    const previousWinners = await Prediction.find({ matchId: match._id, isWinner: true });
+    for (const p of previousWinners) {
+      if (p.predictionType === 'winningTeam' && p.transactionId.includes('_')) {
+        const baseTx = p.transactionId.split('_')[0];
+        await Prediction.updateMany(
+          { transactionId: { $regex: new RegExp('^' + baseTx + '_') } },
+          { $set: { isWinner: false } }
+        );
+      } else {
+        p.isWinner = false;
+        await p.save();
+      }
+    }
+
+    // Now mark the new set of predictions as winners
     await Prediction.updateMany(
-      { _id: { $in: predictionIds }, matchId: match._id },
+      { _id: { $in: Array.from(allWinnerIds) } },
       { $set: { isWinner: true } }
     );
 
@@ -198,5 +237,40 @@ router.delete('/:id', authenticateAdmin, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Check if all predictions in a winningTeam day-wise prediction group are correct
+async function checkGroupEligibility(prediction) {
+  if (prediction.predictionType !== 'winningTeam') {
+    return true;
+  }
+
+  if (!prediction.transactionId.includes('_')) {
+    return true; // Legacy single prediction
+  }
+
+  const baseTx = prediction.transactionId.split('_')[0];
+  const group = await Prediction.find({
+    transactionId: { $regex: new RegExp('^' + baseTx + '_') }
+  }).populate('matchId');
+
+  for (const p of group) {
+    if (!p.matchId) return false;
+    if (p.matchId.status !== 'completed') {
+      return false; // Group is not fully completed yet
+    }
+    const sA = p.matchId.result.scoreA;
+    const sB = p.matchId.result.scoreB;
+    let actualWinner;
+    if (sA > sB) actualWinner = 'teamA';
+    else if (sA < sB) actualWinner = 'teamB';
+    else actualWinner = 'draw';
+
+    if (p.predictedWinner !== actualWinner) {
+      return false; // One prediction in the group is incorrect
+    }
+  }
+
+  return true;
+}
 
 module.exports = router;

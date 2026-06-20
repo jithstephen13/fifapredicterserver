@@ -23,9 +23,19 @@ router.post('/', async (req, res) => {
     referralCode
   } = req.body;
 
-  // Validate request body
+  // Validate request body (excluding matchId since it is in predictions array for winningTeam)
+  const predType = predictionType || 'score';
+  if (!['winningTeam', 'score'].includes(predType)) {
+    return res.status(400).json({ error: 'Invalid prediction type.' });
+  }
+
+  if (predType === 'score') {
+    if (!matchId) {
+      return res.status(400).json({ error: 'Match ID is required.' });
+    }
+  }
+
   if (
-    !matchId ||
     !userName ||
     !phoneNumber ||
     !upiId ||
@@ -35,14 +45,19 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'All fields are required.' });
   }
 
-  const predType = predictionType || 'score';
-  if (!['winningTeam', 'score'].includes(predType)) {
-    return res.status(400).json({ error: 'Invalid prediction type.' });
-  }
-
   if (predType === 'winningTeam') {
-    if (!predictedWinner || !['teamA', 'teamB', 'draw'].includes(predictedWinner)) {
-      return res.status(400).json({ error: 'Winning team prediction is required.' });
+    let predictionsList = req.body.predictions;
+    if (!predictionsList && matchId && predictedWinner) {
+      predictionsList = [{ matchId, predictedWinner }];
+    }
+    if (!Array.isArray(predictionsList) || predictionsList.length === 0) {
+      return res.status(400).json({ error: 'Predictions list is required for winning team prediction.' });
+    }
+
+    for (const p of predictionsList) {
+      if (!p.matchId || !p.predictedWinner || !['teamA', 'teamB', 'draw'].includes(p.predictedWinner)) {
+        return res.status(400).json({ error: 'Winning team prediction and match ID are required for all selections.' });
+      }
     }
   } else {
     if (predictedScoreA === undefined || predictedScoreB === undefined) {
@@ -57,8 +72,8 @@ router.post('/', async (req, res) => {
   }
 
   if (predType === 'winningTeam') {
-    if (numericEntryAmount < 20 || numericEntryAmount > 40) {
-      return res.status(400).json({ error: 'Entry fee for winning team prediction must be between ₹20 and ₹40.' });
+    if (numericEntryAmount < 50 || numericEntryAmount > 140) {
+      return res.status(400).json({ error: 'Entry fee for winning team prediction must be between ₹50 and ₹140.' });
     }
   } else {
     if (numericEntryAmount < 100 || numericEntryAmount > 300) {
@@ -73,24 +88,70 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    // Check if match exists and is scheduled (not completed)
-    const match = await Match.findById(matchId);
-    if (!match) {
-      return res.status(404).json({ error: 'Match not found.' });
-    }
-
-    if (match.status === 'completed') {
-      return res.status(400).json({ error: 'Predictions are closed as the match is completed.' });
-    }
-
-    // Check if kickoff time has passed
     const now = new Date();
-    if (new Date(match.kickoffTime) <= now) {
-      return res.status(400).json({ error: 'Predictions are closed as the match has already started.' });
+
+    // If predictionType is winningTeam, validate all matches belong to same day and none started
+    let targetMatches = [];
+    let predictionsList = req.body.predictions || [];
+    if (predType === 'winningTeam') {
+      if (predictionsList.length === 0 && matchId && predictedWinner) {
+        predictionsList = [{ matchId, predictedWinner }];
+      }
+
+      // Check first match exists
+      const firstMatch = await Match.findById(predictionsList[0].matchId);
+      if (!firstMatch) {
+        return res.status(404).json({ error: 'Match not found.' });
+      }
+
+      const targetDay = getISTDateString(firstMatch.kickoffTime);
+
+      // Find all scheduled matches on that day in Asia/Kolkata timezone
+      const allActiveMatches = await Match.find({ status: 'scheduled' });
+      const dayMatches = allActiveMatches.filter(m => getISTDateString(m.kickoffTime) === targetDay);
+
+      // Ensure the user has predicted a minimum of 3 matches (or all if the day has < 3 scheduled matches)
+      const minRequired = Math.min(3, dayMatches.length);
+      if (predictionsList.length < minRequired) {
+        return res.status(400).json({ error: `You must predict at least ${minRequired} matches of the day.` });
+      }
+
+      const dayMatchIds = dayMatches.map(m => m._id.toString());
+      const predMatchIds = predictionsList.map(p => p.matchId.toString());
+      const allMatchesValid = predMatchIds.every(id => dayMatchIds.includes(id));
+      if (!allMatchesValid) {
+        return res.status(400).json({ error: 'Some predicted matches do not belong to this day.' });
+      }
+
+      // Verify none of the matches of that day have started yet
+      const startedMatch = dayMatches.find(m => new Date(m.kickoffTime) <= now);
+      if (startedMatch) {
+        return res.status(400).json({ error: 'Predictions are closed for this day as a match has already started.' });
+      }
+
+      targetMatches = dayMatches;
+    } else {
+      // Score prediction validations
+      const match = await Match.findById(matchId);
+      if (!match) {
+        return res.status(404).json({ error: 'Match not found.' });
+      }
+
+      if (match.status === 'completed') {
+        return res.status(400).json({ error: 'Predictions are closed as the match is completed.' });
+      }
+
+      if (new Date(match.kickoffTime) <= now) {
+        return res.status(400).json({ error: 'Predictions are closed as the match has already started.' });
+      }
+
+      targetMatches = [match];
     }
 
-    // Check if transaction ID has already been used
-    const duplicateTx = await Prediction.findOne({ transactionId: cleanTransactionId });
+    // Check if transaction ID (or base transaction ID) has already been used
+    const duplicateTx = await Prediction.findOne({
+      transactionId: { $regex: new RegExp('^' + cleanTransactionId + '(_|$)') }
+    });
     if (duplicateTx) {
       return res.status(400).json({ error: 'This UPI UTR / Transaction ID has already been submitted.' });
     }
@@ -132,34 +193,53 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Create the prediction
-    const predictionData = {
-      matchId,
-      userName: userName.trim(),
-      phoneNumber: phoneNumber.trim(),
-      upiId: upiId.trim(),
-      predictionType: predType,
-      entryAmount: numericEntryAmount,
-      transactionId: cleanTransactionId,
-      paymentStatus: 'pending',
-      referralCode: referralCode ? referralCode.trim() : undefined,
-      referredBy,
-      referralApplied
-    };
-
+    // Save predictions
+    const savedPredictions = [];
     if (predType === 'winningTeam') {
-      predictionData.predictedWinner = predictedWinner;
+      for (const predItem of predictionsList) {
+        const predictionData = {
+          matchId: predItem.matchId,
+          userName: userName.trim(),
+          phoneNumber: phoneNumber.trim(),
+          upiId: upiId.trim(),
+          predictionType: predType,
+          entryAmount: numericEntryAmount,
+          transactionId: `${cleanTransactionId}_${predItem.matchId}`,
+          paymentStatus: 'pending',
+          referralCode: referralCode ? referralCode.trim() : undefined,
+          referredBy,
+          referralApplied,
+          predictedWinner: predItem.predictedWinner
+        };
+        const prediction = new Prediction(predictionData);
+        await prediction.save();
+        savedPredictions.push(prediction);
+      }
     } else {
-      predictionData.predictedScoreA = parseInt(predictedScoreA);
-      predictionData.predictedScoreB = parseInt(predictedScoreB);
+      const predictionData = {
+        matchId,
+        userName: userName.trim(),
+        phoneNumber: phoneNumber.trim(),
+        upiId: upiId.trim(),
+        predictionType: predType,
+        entryAmount: numericEntryAmount,
+        transactionId: cleanTransactionId,
+        paymentStatus: 'pending',
+        referralCode: referralCode ? referralCode.trim() : undefined,
+        referredBy,
+        referralApplied,
+        predictedScoreA: parseInt(predictedScoreA),
+        predictedScoreB: parseInt(predictedScoreB)
+      };
+      const prediction = new Prediction(predictionData);
+      await prediction.save();
+      savedPredictions.push(prediction);
     }
 
-    const prediction = new Prediction(predictionData);
-
-    await prediction.save();
     res.status(201).json({
       message: 'Prediction submitted successfully! Pending admin verification.',
-      prediction
+      prediction: savedPredictions[0],
+      predictions: savedPredictions
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -192,62 +272,95 @@ router.get('/winners', async (req, res) => {
       .populate('matchId')
       .sort({ createdAt: -1 });
     
-    const publicWinners = winners.map(w => {
-      if (!w.matchId) return null;
-
-      const predType = w.predictionType || 'score';
-
-      if (predType === 'winningTeam') {
-        let actualWinner;
-        const scoreA = w.matchId.result.scoreA;
-        const scoreB = w.matchId.result.scoreB;
-        if (scoreA > scoreB) {
-          actualWinner = 'teamA';
-        } else if (scoreA < scoreB) {
-          actualWinner = 'teamB';
-        } else {
-          actualWinner = 'draw';
-        }
-
-        if (w.predictedWinner !== actualWinner) {
-          return null;
-        }
-      } else {
-        // Ensure the predicted score matches the actual match result
-        if (
-          w.predictedScoreA !== w.matchId.result.scoreA ||
-          w.predictedScoreB !== w.matchId.result.scoreB
-        ) {
-          return null;
-        }
+    // Group winners by base transaction ID to handle day-wise winning team predictions
+    const groupedWinners = {};
+    for (const w of winners) {
+      if (!w.matchId) continue;
+      const baseTx = w.transactionId.split('_')[0];
+      if (!groupedWinners[baseTx]) {
+        groupedWinners[baseTx] = [];
       }
+      groupedWinners[baseTx].push(w);
+    }
+
+    const publicWinners = [];
+    for (const baseTx in groupedWinners) {
+      const group = groupedWinners[baseTx];
+      const w = group[0];
 
       const phone = w.phoneNumber || '';
       const maskedPhone = phone.length >= 10 
         ? `${phone.substring(0, 3)}****${phone.substring(phone.length - 3)}`
         : '***';
-        
-      return {
-        _id: w._id,
-        userName: w.userName,
-        phoneNumber: maskedPhone,
-        predictionType: predType,
-        predictedWinner: w.predictedWinner,
-        predictedScoreA: w.predictedScoreA,
-        predictedScoreB: w.predictedScoreB,
-        entryAmount: w.entryAmount || 20,
-        prizeAmount: predType === 'winningTeam' ? (w.entryAmount || 20) * 2 : (w.entryAmount || 20) * 3,
-        matchId: {
-          _id: w.matchId._id,
-          teamA: w.matchId.teamA,
-          teamALogo: w.matchId.teamALogo,
-          teamB: w.matchId.teamB,
-          teamBLogo: w.matchId.teamBLogo,
-          result: w.matchId.result
-        },
-        createdAt: w.createdAt
-      };
-    }).filter(Boolean);
+
+      const entryAmount = w.entryAmount || 20;
+      const predictionType = w.predictionType || 'score';
+
+      if (predictionType === 'winningTeam') {
+        let allCorrect = true;
+        const matchesList = [];
+
+        for (const p of group) {
+          const scoreA = p.matchId.result.scoreA;
+          const scoreB = p.matchId.result.scoreB;
+          let actualWinner;
+          if (scoreA > scoreB) actualWinner = 'teamA';
+          else if (scoreA < scoreB) actualWinner = 'teamB';
+          else actualWinner = 'draw';
+
+          if (p.predictedWinner !== actualWinner) {
+            allCorrect = false;
+            break;
+          }
+
+          matchesList.push({
+            _id: p.matchId._id,
+            teamA: p.matchId.teamA,
+            teamALogo: p.matchId.teamALogo,
+            teamB: p.matchId.teamB,
+            teamBLogo: p.matchId.teamBLogo,
+            result: p.matchId.result,
+            predictedWinner: p.predictedWinner
+          });
+        }
+
+        if (!allCorrect) continue;
+
+        publicWinners.push({
+          _id: w._id,
+          userName: w.userName,
+          phoneNumber: maskedPhone,
+          predictionType,
+          entryAmount,
+          prizeAmount: entryAmount * 2,
+          matches: matchesList,
+          matchId: w.matchId,
+          createdAt: w.createdAt
+        });
+      } else {
+        // Score prediction
+        if (
+          w.predictedScoreA !== w.matchId.result.scoreA ||
+          w.predictedScoreB !== w.matchId.result.scoreB
+        ) {
+          continue;
+        }
+
+        publicWinners.push({
+          _id: w._id,
+          userName: w.userName,
+          phoneNumber: maskedPhone,
+          predictionType,
+          predictedWinner: w.predictedWinner,
+          predictedScoreA: w.predictedScoreA,
+          predictedScoreB: w.predictedScoreB,
+          entryAmount,
+          prizeAmount: entryAmount * 3,
+          matchId: w.matchId,
+          createdAt: w.createdAt
+        });
+      }
+    }
 
     res.json(publicWinners);
   } catch (error) {
@@ -281,7 +394,15 @@ router.get('/admin/all', authenticateAdmin, async (req, res) => {
     const predictions = await Prediction.find(filter)
       .populate('matchId')
       .sort({ createdAt: -1 });
-    res.json(predictions);
+
+    const results = [];
+    for (const pred of predictions) {
+      const predObj = pred.toObject();
+      predObj.isGroupEligible = await checkGroupEligibility(pred);
+      results.push(predObj);
+    }
+
+    res.json(results);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -301,15 +422,21 @@ router.put('/:id/payment', authenticateAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Prediction not found.' });
     }
 
-    prediction.paymentStatus = paymentStatus;
-    await prediction.save();
+    // Update all predictions in the same day group
+    const baseTx = prediction.transactionId.split('_')[0];
+    await Prediction.updateMany(
+      { transactionId: { $regex: new RegExp('^' + baseTx + '(_|$)') } },
+      { $set: { paymentStatus } }
+    );
 
     if (paymentStatus === 'verified' && prediction.referralApplied && prediction.referredBy) {
-      await evaluateReferralRewards(prediction);
+      // Find one of the updated predictions to pass
+      const updatedPrediction = await Prediction.findById(req.params.id);
+      await evaluateReferralRewards(updatedPrediction);
     }
 
     res.json({
-      message: `Payment status updated to ${paymentStatus}.`,
+      message: `Payment status updated to ${paymentStatus} for the group.`,
       prediction
     });
   } catch (error) {
@@ -333,13 +460,16 @@ async function evaluateReferralRewards(prediction) {
       return;
     }
 
-    // 2. Count verified predictions of the specific type for this referred user
-    const verifiedCount = await Prediction.countDocuments({
+    // 2. Count verified unique transactions of the specific type for this referred user
+    const allVerified = await Prediction.find({
       referredBy,
       phoneNumber,
       predictionType,
       paymentStatus: 'verified'
     });
+
+    const uniqueTxIds = new Set(allVerified.map(p => p.transactionId.split('_')[0]));
+    const verifiedCount = uniqueTxIds.size;
 
     // 3. Check thresholds & Create reward if eligible
     if (predictionType === 'winningTeam') {
@@ -396,6 +526,52 @@ async function evaluateReferralRewards(prediction) {
   } catch (error) {
     console.error('Error in evaluateReferralRewards:', error);
   }
+}
+
+// Format date into standard Indian Standard Time (Asia/Kolkata) day string
+const getISTDateString = (date) => {
+  const d = new Date(date);
+  return d.toLocaleDateString('en-US', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+// Check if all predictions in a winningTeam day-wise prediction group are correct
+async function checkGroupEligibility(prediction) {
+  if (prediction.predictionType !== 'winningTeam') {
+    return true;
+  }
+
+  if (!prediction.transactionId.includes('_')) {
+    return true; // Legacy single prediction
+  }
+
+  const baseTx = prediction.transactionId.split('_')[0];
+  const group = await Prediction.find({
+    transactionId: { $regex: new RegExp('^' + baseTx + '_') }
+  }).populate('matchId');
+
+  for (const p of group) {
+    if (!p.matchId) return false;
+    if (p.matchId.status !== 'completed') {
+      return false; // Group is not fully completed yet
+    }
+    const sA = p.matchId.result.scoreA;
+    const sB = p.matchId.result.scoreB;
+    let actualWinner;
+    if (sA > sB) actualWinner = 'teamA';
+    else if (sA < sB) actualWinner = 'teamB';
+    else actualWinner = 'draw';
+
+    if (p.predictedWinner !== actualWinner) {
+      return false; // One prediction in the group is incorrect
+    }
+  }
+
+  return true;
 }
 
 module.exports = router;
