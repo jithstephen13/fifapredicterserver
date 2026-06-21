@@ -175,13 +175,44 @@ router.post('/:id/winners', authenticateAdmin, async (req, res) => {
     // Build the set of all prediction IDs that should be set as winners
     const allWinnerIds = new Set();
     for (const p of selectedPredictions) {
-      if (p.predictionType === 'winningTeam' && p.transactionId.includes('_')) {
-        const baseTx = p.transactionId.split('_')[0];
-        const group = await Prediction.find({
-          transactionId: { $regex: new RegExp('^' + baseTx + '_') }
-        });
-        group.forEach(g => allWinnerIds.add(g._id.toString()));
+      if (p.predictionType === 'winningTeam') {
+        const isEligible = await checkGroupEligibility(p);
+        if (!isEligible) {
+          return res.status(400).json({ error: `Prediction ${p._id} is not eligible to be a winner (either the day prediction group is incomplete or some matches are incorrect).` });
+        }
+        
+        // Also check correctness for legacy single winningTeam prediction since checkGroupEligibility returns true for it
+        if (!p.transactionId.includes('_')) {
+          const matchOfPred = await Match.findById(p.matchId);
+          if (!matchOfPred || matchOfPred.status !== 'completed') {
+            return res.status(400).json({ error: `Match for prediction ${p._id} is not completed.` });
+          }
+          const sA = matchOfPred.result.scoreA;
+          const sB = matchOfPred.result.scoreB;
+          const actualWinner = sA > sB ? 'teamA' : sA < sB ? 'teamB' : 'draw';
+          if (p.predictedWinner !== actualWinner) {
+            return res.status(400).json({ error: `Prediction ${p._id} is incorrect.` });
+          }
+        }
+
+        if (p.transactionId.includes('_')) {
+          const baseTx = p.transactionId.split('_')[0];
+          const group = await Prediction.find({
+            transactionId: { $regex: new RegExp('^' + baseTx + '_') }
+          });
+          group.forEach(g => allWinnerIds.add(g._id.toString()));
+        } else {
+          allWinnerIds.add(p._id.toString());
+        }
       } else {
+        // Score prediction
+        const matchOfPred = await Match.findById(p.matchId);
+        if (!matchOfPred || matchOfPred.status !== 'completed') {
+          return res.status(400).json({ error: `Match for prediction ${p._id} is not completed.` });
+        }
+        if (p.predictedScoreA !== matchOfPred.result.scoreA || p.predictedScoreB !== matchOfPred.result.scoreB) {
+          return res.status(400).json({ error: `Score prediction ${p._id} is incorrect.` });
+        }
         allWinnerIds.add(p._id.toString());
       }
     }
