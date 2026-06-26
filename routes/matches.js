@@ -32,8 +32,14 @@ router.get('/active', async (req, res) => {
 router.post('/', authenticateAdmin, async (req, res) => {
   const { teamA, teamB, teamALogo, teamBLogo, kickoffTime, winnerCount, prizeAmount } = req.body;
 
-  if (!teamA || !teamB || !kickoffTime) {
-    return res.status(400).json({ error: 'Team A, Team B, and kickoff time are required' });
+  if (!teamA) {
+    return res.status(400).json({ error: 'Team A is required' });
+  }
+  if (!teamB) {
+    return res.status(400).json({ error: 'Team B is required' });
+  }
+  if (!kickoffTime) {
+    return res.status(400).json({ error: 'Kickoff time is required' });
   }
 
   try {
@@ -86,8 +92,11 @@ router.put('/:id', authenticateAdmin, async (req, res) => {
 router.post('/:id/complete', authenticateAdmin, async (req, res) => {
   const { scoreA, scoreB } = req.body;
 
-  if (scoreA === undefined || scoreB === undefined) {
-    return res.status(400).json({ error: 'Score A and Score B are required' });
+  if (scoreA === undefined) {
+    return res.status(400).json({ error: 'Score A is required' });
+  }
+  if (scoreB === undefined) {
+    return res.status(400).json({ error: 'Score B is required' });
   }
 
   try {

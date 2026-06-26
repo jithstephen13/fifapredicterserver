@@ -35,14 +35,20 @@ router.post('/', async (req, res) => {
     }
   }
 
-  if (
-    !userName ||
-    !phoneNumber ||
-    !upiId ||
-    entryAmount === undefined ||
-    !transactionId
-  ) {
-    return res.status(400).json({ error: 'All fields are required.' });
+  if (!userName) {
+    return res.status(400).json({ error: 'User name is required.' });
+  }
+  if (!phoneNumber) {
+    return res.status(400).json({ error: 'Phone number is required.' });
+  }
+  if (!upiId) {
+    return res.status(400).json({ error: 'UPI ID is required.' });
+  }
+  if (entryAmount === undefined) {
+    return res.status(400).json({ error: 'Entry amount is required.' });
+  }
+  if (!transactionId) {
+    return res.status(400).json({ error: 'Transaction ID is required.' });
   }
 
   if (predType === 'winningTeam') {

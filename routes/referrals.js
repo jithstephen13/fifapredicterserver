@@ -19,8 +19,11 @@ function generateCode(phoneNumber, upiId) {
 router.post('/generate', async (req, res) => {
   const { phoneNumber, upiId } = req.body;
 
-  if (!phoneNumber || !upiId) {
-    return res.status(400).json({ error: 'Phone number and UPI ID are required.' });
+  if (!phoneNumber) {
+    return res.status(400).json({ error: 'Phone number is required.' });
+  }
+  if (!upiId) {
+    return res.status(400).json({ error: 'UPI ID is required.' });
   }
 
   const cleanPhone = phoneNumber.trim();
@@ -67,8 +70,11 @@ router.post('/generate', async (req, res) => {
 router.post('/recover', async (req, res) => {
   const { phoneNumber, upiId } = req.body;
 
-  if (!phoneNumber || !upiId) {
-    return res.status(400).json({ error: 'Phone number and UPI ID are required.' });
+  if (!phoneNumber) {
+    return res.status(400).json({ error: 'Phone number is required.' });
+  }
+  if (!upiId) {
+    return res.status(400).json({ error: 'UPI ID is required.' });
   }
 
   try {
