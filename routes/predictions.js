@@ -271,7 +271,7 @@ router.get('/winners', async (req, res) => {
     const winners = await Prediction.find({ isWinner: true })
       .populate('matchId')
       .sort({ createdAt: -1 });
-    
+
     // Group winners by base transaction ID to handle day-wise winning team predictions
     const groupedWinners = {};
     for (const w of winners) {
@@ -289,7 +289,7 @@ router.get('/winners', async (req, res) => {
       const w = group[0];
 
       const phone = w.phoneNumber || '';
-      const maskedPhone = phone.length >= 10 
+      const maskedPhone = phone.length >= 10
         ? `${phone.substring(0, 3)}****${phone.substring(phone.length - 3)}`
         : '***';
 
@@ -419,7 +419,7 @@ router.put('/:id/payment', authenticateAdmin, async (req, res) => {
   try {
     const prediction = await Prediction.findById(req.params.id);
     if (!prediction) {
-      return res.status(404).json({ error: 'Prediction not found.' });
+      return res.status(404).json({ error: 'Prediction not found ' });
     }
 
     // Update all predictions in the same day group
