@@ -19,7 +19,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/matches', matchRoutes);
-app.use('/api/predictions', predictionRoutes);
+app.use('/api/predictions_v2', predictionRoutes);
 app.use('/api/referrals', referralRoutes);
 
 // Health check endpoint
