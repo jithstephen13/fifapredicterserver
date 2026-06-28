@@ -552,228 +552,283 @@ const matchesData = [
     kickoffTime: new Date('2026-06-28T07:30:00+05:30')
   },
   {
-    teamA: '2A',
-    teamALogo: '🏳️',
-    teamB: '2B',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-06-29T00:30:00+05:30')
+    teamA: 'South Africa',
+    teamALogo: '🇿🇦',
+    teamB: 'Canada',
+    teamBLogo: '🇨🇦',
+    kickoffTime: new Date('2026-06-28T20:00:00+05:30'),
+    matchCode: 'R32-3',
+    venue: 'Los Angeles Stadium'
   },
   {
-    teamA: '1C',
-    teamALogo: '🏳️',
-    teamB: '2F',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-06-29T22:30:00+05:30')
+    teamA: 'Brazil',
+    teamALogo: '🇧🇷',
+    teamB: 'Japan',
+    teamBLogo: '🇯🇵',
+    kickoffTime: new Date('2026-06-29T18:00:00+05:30'),
+    matchCode: 'R32-9',
+    venue: 'Houston Stadium'
   },
   {
-    teamA: '1E',
-    teamALogo: '🏳️',
-    teamB: '3ABCDF',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-06-30T02:00:00+05:30')
+    teamA: 'Germany',
+    teamALogo: '🇩🇪',
+    teamB: 'Paraguay',
+    teamBLogo: '🇵🇾',
+    kickoffTime: new Date('2026-06-29T21:30:00+05:30'),
+    matchCode: 'R32-1',
+    venue: 'Boston Stadium'
   },
   {
-    teamA: '1F',
-    teamALogo: '🏳️',
-    teamB: '2C',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-06-30T06:30:00+05:30')
+    teamA: 'Netherlands',
+    teamALogo: '🇳🇱',
+    teamB: 'Morocco',
+    teamBLogo: '🇲🇦',
+    kickoffTime: new Date('2026-06-30T02:00:00+05:30'),
+    matchCode: 'R32-4',
+    venue: 'Estadio Monterrey'
   },
   {
-    teamA: '2E',
-    teamALogo: '🏳️',
-    teamB: '2I',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-06-30T22:30:00+05:30')
+    teamA: 'Ivory Coast',
+    teamALogo: '🇨🇮',
+    teamB: 'Norway',
+    teamBLogo: '🇳🇴',
+    kickoffTime: new Date('2026-06-30T18:00:00+05:30'),
+    matchCode: 'R32-10',
+    venue: 'Dallas Stadium'
   },
   {
-    teamA: '1I',
-    teamALogo: '🏳️',
-    teamB: '3CDFGH',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-01T02:30:00+05:30')
+    teamA: 'France',
+    teamALogo: '🇫🇷',
+    teamB: 'Sweden',
+    teamBLogo: '🇸🇪',
+    kickoffTime: new Date('2026-06-30T22:00:00+05:30'),
+    matchCode: 'R32-2',
+    venue: 'New York New Jersey Stadium'
   },
   {
-    teamA: '1A',
-    teamALogo: '🏳️',
-    teamB: '3CEFHI',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-01T06:30:00+05:30')
+    teamA: 'Mexico',
+    teamALogo: '🇲🇽',
+    teamB: 'Ecuador',
+    teamBLogo: '🇪🇨',
+    kickoffTime: new Date('2026-07-01T02:00:00+05:30'),
+    matchCode: 'R32-11',
+    venue: 'Mexico City Stadium'
   },
   {
-    teamA: '1L',
-    teamALogo: '🏳️',
-    teamB: '3EHIJK',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-01T21:30:00+05:30')
+    teamA: 'England',
+    teamALogo: '🏴',
+    teamB: 'Congo DR',
+    teamBLogo: '🇨🇩',
+    kickoffTime: new Date('2026-07-01T17:00:00+05:30'),
+    matchCode: 'R32-12',
+    venue: 'Atlanta Stadium'
   },
   {
-    teamA: '1G',
-    teamALogo: '🏳️',
-    teamB: '3AEHIJ',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-02T01:30:00+05:30')
+    teamA: 'Belgium',
+    teamALogo: '🇧🇪',
+    teamB: 'Senegal',
+    teamBLogo: '🇸🇳',
+    kickoffTime: new Date('2026-07-01T21:00:00+05:30'),
+    matchCode: 'R32-8',
+    venue: 'Seattle Stadium'
   },
   {
-    teamA: '1D',
-    teamALogo: '🏳️',
-    teamB: '3BEFIJ',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-02T05:30:00+05:30')
+    teamA: 'United States',
+    teamALogo: '🇺🇸',
+    teamB: 'Bosnia-Herzegovina',
+    teamBLogo: '🇧🇦',
+    kickoffTime: new Date('2026-07-02T01:00:00+05:30'),
+    matchCode: 'R32-7',
+    venue: 'San Francisco Bay Area Stadium'
   },
   {
-    teamA: '1H',
-    teamALogo: '🏳️',
-    teamB: '2J',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-03T00:30:00+05:30')
+    teamA: 'Spain',
+    teamALogo: '🇪🇸',
+    teamB: 'Austria',
+    teamBLogo: '🇦🇹',
+    kickoffTime: new Date('2026-07-02T20:00:00+05:30'),
+    matchCode: 'R32-6',
+    venue: 'Los Angeles Stadium'
   },
   {
-    teamA: '2K',
-    teamALogo: '🏳️',
-    teamB: '2L',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-03T04:30:00+05:30')
+    teamA: 'Portugal',
+    teamALogo: '🇵🇹',
+    teamB: 'Croatia',
+    teamBLogo: '🇭🇷',
+    kickoffTime: new Date('2026-07-03T00:00:00+05:30'),
+    matchCode: 'R32-5',
+    venue: 'Toronto Stadium'
   },
   {
-    teamA: '1B',
-    teamALogo: '🏳️',
-    teamB: '3EFGIJ',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-03T08:30:00+05:30')
+    teamA: 'Switzerland',
+    teamALogo: '🇨🇭',
+    teamB: 'Algeria',
+    teamBLogo: '🇩🇿',
+    kickoffTime: new Date('2026-07-03T04:00:00+05:30'),
+    matchCode: 'R32-15',
+    venue: 'BC Place Vancouver'
   },
   {
-    teamA: '2D',
-    teamALogo: '🏳️',
-    teamB: '2G',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-03T23:30:00+05:30')
+    teamA: 'Australia',
+    teamALogo: '🇦🇺',
+    teamB: 'Egypt',
+    teamBLogo: '🇪🇬',
+    kickoffTime: new Date('2026-07-03T19:00:00+05:30'),
+    matchCode: 'R32-14',
+    venue: 'Dallas Stadium'
   },
   {
-    teamA: '1J',
-    teamALogo: '🏳️',
-    teamB: '2H',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-04T03:30:00+05:30')
+    teamA: 'Argentina',
+    teamALogo: '🇦🇷',
+    teamB: 'Cape Verde',
+    teamBLogo: '🇨🇻',
+    kickoffTime: new Date('2026-07-03T23:00:00+05:30'),
+    matchCode: 'R32-13',
+    venue: 'Miami Stadium'
   },
   {
-    teamA: '1K',
-    teamALogo: '🏳️',
-    teamB: '3DEIJL',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-04T07:00:00+05:30')
+    teamA: 'Colombia',
+    teamALogo: '🇨🇴',
+    teamB: 'Ghana',
+    teamBLogo: '🇬🇭',
+    kickoffTime: new Date('2026-07-04T02:30:00+05:30'),
+    matchCode: 'R32-16',
+    venue: 'Kansas City Stadium'
   },
   {
-    teamA: 'W73',
+    teamA: 'W-32-2',
     teamALogo: '🏳️',
-    teamB: 'W75',
+    teamB: 'W-32-5',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-04T22:30:00+05:30')
+    kickoffTime: new Date('2026-07-04T22:00:00+05:30'),
+    matchCode: 'R16-1',
+    venue: 'Philadelphia Stadium'
   },
   {
-    teamA: 'W74',
+    teamA: 'W-32-1',
     teamALogo: '🏳️',
-    teamB: 'W77',
+    teamB: 'W-32-3',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-05T02:30:00+05:30')
+    kickoffTime: new Date('2026-07-04T18:00:00+05:30'),
+    matchCode: 'R16-2',
+    venue: 'Houston Stadium'
   },
   {
-    teamA: 'W76',
+    teamA: 'W-32-11',
     teamALogo: '🏳️',
-    teamB: 'W78',
+    teamB: 'W-32-12',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-06T01:30:00+05:30')
+    kickoffTime: new Date('2026-07-06T20:00:00+05:30'),
+    matchCode: 'R16-3',
+    venue: 'Dallas Stadium'
   },
   {
-    teamA: 'W79',
+    teamA: 'W-32-9',
     teamALogo: '🏳️',
-    teamB: 'W80',
+    teamB: 'W-32-10',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-06T05:30:00+05:30')
+    kickoffTime: new Date('2026-07-07T01:00:00+05:30'),
+    matchCode: 'R16-4',
+    venue: 'Seattle Stadium'
   },
   {
-    teamA: 'W83',
+    teamA: 'W-32-4',
     teamALogo: '🏳️',
-    teamB: 'W84',
+    teamB: 'W-32-6',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-07T00:30:00+05:30')
+    kickoffTime: new Date('2026-07-05T21:00:00+05:30'),
+    matchCode: 'R16-5',
+    venue: 'New York New Jersey Stadium'
   },
   {
-    teamA: 'W81',
+    teamA: 'W-32-7',
     teamALogo: '🏳️',
-    teamB: 'W82',
+    teamB: 'W-32-8',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-07T05:30:00+05:30')
+    kickoffTime: new Date('2026-07-06T01:00:00+05:30'),
+    matchCode: 'R16-6',
+    venue: 'Mexico City Stadium'
   },
   {
-    teamA: 'W86',
+    teamA: 'W-32-14',
     teamALogo: '🏳️',
-    teamB: 'W88',
+    teamB: 'W-32-16',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-07T21:30:00+05:30')
+    kickoffTime: new Date('2026-07-07T17:00:00+05:30'),
+    matchCode: 'R16-7',
+    venue: 'Atlanta Stadium'
   },
   {
-    teamA: 'W85',
+    teamA: 'W-32-13',
     teamALogo: '🏳️',
-    teamB: 'W87',
+    teamB: 'W-32-15',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-08T01:30:00+05:30')
+    kickoffTime: new Date('2026-07-07T21:00:00+05:30'),
+    matchCode: 'R16-8',
+    venue: 'BC Place Vancouver'
   },
   {
-    teamA: 'TBD',
+    teamA: 'W-16-1',
     teamALogo: '🏳️',
-    teamB: 'TBD',
+    teamB: 'W-16-2',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-10T01:30:00+05:30')
+    kickoffTime: new Date('2026-07-09T21:00:00+05:30'),
+    matchCode: 'QF-1',
+    venue: 'Boston Stadium'
   },
   {
-    teamA: 'TBD',
+    teamA: 'W-16-5',
     teamALogo: '🏳️',
-    teamB: 'TBD',
+    teamB: 'W-16-6',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-11T00:30:00+05:30')
+    kickoffTime: new Date('2026-07-10T20:00:00+05:30'),
+    matchCode: 'QF-2',
+    venue: 'Los Angeles Stadium'
   },
   {
-    teamA: 'TBD',
+    teamA: 'W-16-3',
     teamALogo: '🏳️',
-    teamB: 'TBD',
+    teamB: 'W-16-4',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-12T02:30:00+05:30')
+    kickoffTime: new Date('2026-07-11T22:00:00+05:30'),
+    matchCode: 'QF-3',
+    venue: 'Miami Stadium'
   },
   {
-    teamA: 'TBD',
+    teamA: 'W-16-7',
     teamALogo: '🏳️',
-    teamB: 'TBD',
+    teamB: 'W-16-8',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-12T06:30:00+05:30')
+    kickoffTime: new Date('2026-07-12T02:00:00+05:30'),
+    matchCode: 'QF-4',
+    venue: 'Kansas City Stadium'
   },
   {
-    teamA: 'TBD',
+    teamA: 'W-QF1',
     teamALogo: '🏳️',
-    teamB: 'TBD',
+    teamB: 'W-QF2',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-15T00:30:00+05:30')
+    kickoffTime: new Date('2026-07-14T20:00:00+05:30'),
+    matchCode: 'SF-1',
+    venue: 'Dallas Stadium'
   },
   {
-    teamA: 'TBD',
+    teamA: 'W-QF3',
     teamALogo: '🏳️',
-    teamB: 'TBD',
+    teamB: 'W-QF4',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-16T00:30:00+05:30')
+    kickoffTime: new Date('2026-07-15T20:00:00+05:30'),
+    matchCode: 'SF-2',
+    venue: 'Atlanta Stadium'
   },
   {
-    teamA: 'TBD',
+    teamA: 'W-SF1',
     teamALogo: '🏳️',
-    teamB: 'TBD',
+    teamB: 'W-SF2',
     teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-19T02:30:00+05:30')
-  },
-  {
-    teamA: 'TBD',
-    teamALogo: '🏳️',
-    teamB: 'TBD',
-    teamBLogo: '🏳️',
-    kickoffTime: new Date('2026-07-20T00:30:00+05:30')
+    kickoffTime: new Date('2026-07-19T20:00:00+05:30'),
+    matchCode: 'F',
+    venue: 'New York New Jersey Stadium'
   }
 ];
 

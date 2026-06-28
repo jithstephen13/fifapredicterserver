@@ -13,7 +13,14 @@ const matchSchema = new mongoose.Schema({
   },
   winnerCount: { type: Number, default: 2 },
   prizeAmount: { type: Number, default: 100 },
+  multiplierTeamA: { type: Number, default: 2 },
+  multiplierTeamB: { type: Number, default: 2 },
+  multiplierDraw: { type: Number, default: 2 },
+  multiplierScore: { type: Number, default: 3 },
+  matchCode: { type: String }, // R32-1, R16-1, QF-1, SF-1, F
+  venue: { type: String },
   createdAt: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('Match', matchSchema);
+

@@ -52,20 +52,16 @@ router.post('/', async (req, res) => {
   }
 
   if (predType === 'winningTeam') {
-    let predictionsList = req.body.predictions;
-    if (!predictionsList && matchId && predictedWinner) {
-      predictionsList = [{ matchId, predictedWinner }];
+    if (!matchId) {
+      return res.status(400).json({ error: 'Match ID is required.' });
     }
-    if (!Array.isArray(predictionsList) || predictionsList.length === 0) {
-      return res.status(400).json({ error: 'Predictions list is required for winning team prediction.' });
-    }
-
-    for (const p of predictionsList) {
-      if (!p.matchId || !p.predictedWinner || !['teamA', 'teamB', 'draw'].includes(p.predictedWinner)) {
-        return res.status(400).json({ error: 'Winning team prediction and match ID are required for all selections.' });
-      }
+    if (!predictedWinner || !['teamA', 'teamB', 'draw'].includes(predictedWinner)) {
+      return res.status(400).json({ error: 'Predicted winner is required.' });
     }
   } else {
+    if (!matchId) {
+      return res.status(400).json({ error: 'Match ID is required.' });
+    }
     if (predictedScoreA === undefined || predictedScoreB === undefined) {
       return res.status(400).json({ error: 'Predicted score is required.' });
     }
@@ -96,67 +92,22 @@ router.post('/', async (req, res) => {
   try {
     const now = new Date();
 
-    // If predictionType is winningTeam, validate all matches belong to same day and none started
-    let targetMatches = [];
-    let predictionsList = req.body.predictions || [];
-    if (predType === 'winningTeam') {
-      if (predictionsList.length === 0 && matchId && predictedWinner) {
-        predictionsList = [{ matchId, predictedWinner }];
-      }
-
-      // Check first match exists
-      const firstMatch = await Match.findById(predictionsList[0].matchId);
-      if (!firstMatch) {
-        return res.status(404).json({ error: 'Match not found.' });
-      }
-
-      const targetDay = getISTDateString(firstMatch.kickoffTime);
-
-      // Find all scheduled matches on that day in Asia/Kolkata timezone
-      const allActiveMatches = await Match.find({ status: 'scheduled' });
-      const dayMatches = allActiveMatches.filter(m => getISTDateString(m.kickoffTime) === targetDay);
-
-      // Ensure the user has predicted a minimum of 3 matches (or all if the day has < 3 scheduled matches)
-      const minRequired = Math.min(3, dayMatches.length);
-      if (predictionsList.length < minRequired) {
-        return res.status(400).json({ error: `You must predict at least ${minRequired} matches of the day.` });
-      }
-
-      const dayMatchIds = dayMatches.map(m => m._id.toString());
-      const predMatchIds = predictionsList.map(p => p.matchId.toString());
-      const allMatchesValid = predMatchIds.every(id => dayMatchIds.includes(id));
-      if (!allMatchesValid) {
-        return res.status(400).json({ error: 'Some predicted matches do not belong to this day.' });
-      }
-
-      // Verify none of the matches of that day have started yet
-      const startedMatch = dayMatches.find(m => new Date(m.kickoffTime) <= now);
-      if (startedMatch) {
-        return res.status(400).json({ error: 'Predictions are closed for this day as a match has already started.' });
-      }
-
-      targetMatches = dayMatches;
-    } else {
-      // Score prediction validations
-      const match = await Match.findById(matchId);
-      if (!match) {
-        return res.status(404).json({ error: 'Match not found.' });
-      }
-
-      if (match.status === 'completed') {
-        return res.status(400).json({ error: 'Predictions are closed as the match is completed.' });
-      }
-
-      if (new Date(match.kickoffTime) <= now) {
-        return res.status(400).json({ error: 'Predictions are closed as the match has already started.' });
-      }
-
-      targetMatches = [match];
+    const match = await Match.findById(matchId);
+    if (!match) {
+      return res.status(404).json({ error: 'Match not found.' });
     }
 
-    // Check if transaction ID (or base transaction ID) has already been used
+    if (match.status === 'completed') {
+      return res.status(400).json({ error: 'Predictions are closed as the match is completed.' });
+    }
+
+    if (new Date(match.kickoffTime) <= now) {
+      return res.status(400).json({ error: 'Predictions are closed as the match has already started.' });
+    }
+
+    // Check if transaction ID has already been used
     const duplicateTx = await Prediction.findOne({
-      transactionId: { $regex: new RegExp('^' + cleanTransactionId + '(_|$)') }
+      transactionId: cleanTransactionId
     });
     if (duplicateTx) {
       return res.status(400).json({ error: 'This UPI UTR / Transaction ID has already been submitted.' });
@@ -199,53 +150,30 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Save predictions
-    const savedPredictions = [];
-    if (predType === 'winningTeam') {
-      for (const predItem of predictionsList) {
-        const predictionData = {
-          matchId: predItem.matchId,
-          userName: userName.trim(),
-          phoneNumber: phoneNumber.trim(),
-          upiId: upiId.trim(),
-          predictionType: predType,
-          entryAmount: numericEntryAmount,
-          transactionId: `${cleanTransactionId}_${predItem.matchId}`,
-          paymentStatus: 'pending',
-          referralCode: referralCode ? referralCode.trim() : undefined,
-          referredBy,
-          referralApplied,
-          predictedWinner: predItem.predictedWinner
-        };
-        const prediction = new Prediction(predictionData);
-        await prediction.save();
-        savedPredictions.push(prediction);
-      }
-    } else {
-      const predictionData = {
-        matchId,
-        userName: userName.trim(),
-        phoneNumber: phoneNumber.trim(),
-        upiId: upiId.trim(),
-        predictionType: predType,
-        entryAmount: numericEntryAmount,
-        transactionId: cleanTransactionId,
-        paymentStatus: 'pending',
-        referralCode: referralCode ? referralCode.trim() : undefined,
-        referredBy,
-        referralApplied,
-        predictedScoreA: parseInt(predictedScoreA),
-        predictedScoreB: parseInt(predictedScoreB)
-      };
-      const prediction = new Prediction(predictionData);
-      await prediction.save();
-      savedPredictions.push(prediction);
-    }
+    // Save prediction
+    const predictionData = {
+      matchId,
+      userName: userName.trim(),
+      phoneNumber: phoneNumber.trim(),
+      upiId: upiId.trim(),
+      predictionType: predType,
+      entryAmount: numericEntryAmount,
+      transactionId: cleanTransactionId,
+      paymentStatus: 'pending',
+      referralCode: referralCode ? referralCode.trim() : undefined,
+      referredBy,
+      referralApplied,
+      predictedWinner: predType === 'winningTeam' ? predictedWinner : undefined,
+      predictedScoreA: predType === 'score' ? parseInt(predictedScoreA) : undefined,
+      predictedScoreB: predType === 'score' ? parseInt(predictedScoreB) : undefined
+    };
+
+    const prediction = new Prediction(predictionData);
+    await prediction.save();
 
     res.status(201).json({
       message: 'Prediction submitted successfully! Pending admin verification.',
-      prediction: savedPredictions[0],
-      predictions: savedPredictions
+      prediction
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -278,22 +206,9 @@ router.get('/winners', async (req, res) => {
       .populate('matchId')
       .sort({ createdAt: -1 });
 
-    // Group winners by base transaction ID to handle day-wise winning team predictions
-    const groupedWinners = {};
+    const publicWinners = [];
     for (const w of winners) {
       if (!w.matchId) continue;
-      const baseTx = w.transactionId.split('_')[0];
-      if (!groupedWinners[baseTx]) {
-        groupedWinners[baseTx] = [];
-      }
-      groupedWinners[baseTx].push(w);
-    }
-
-    const publicWinners = [];
-    for (const baseTx in groupedWinners) {
-      const group = groupedWinners[baseTx];
-      const w = group[0];
-
       const phone = w.phoneNumber || '';
       const maskedPhone = phone.length >= 10
         ? `${phone.substring(0, 3)}****${phone.substring(phone.length - 3)}`
@@ -303,34 +218,23 @@ router.get('/winners', async (req, res) => {
       const predictionType = w.predictionType || 'score';
 
       if (predictionType === 'winningTeam') {
-        let allCorrect = true;
-        const matchesList = [];
+        const scoreA = w.matchId.result.scoreA;
+        const scoreB = w.matchId.result.scoreB;
+        let actualWinner;
+        if (scoreA > scoreB) actualWinner = 'teamA';
+        else if (scoreA < scoreB) actualWinner = 'teamB';
+        else actualWinner = 'draw';
 
-        for (const p of group) {
-          const scoreA = p.matchId.result.scoreA;
-          const scoreB = p.matchId.result.scoreB;
-          let actualWinner;
-          if (scoreA > scoreB) actualWinner = 'teamA';
-          else if (scoreA < scoreB) actualWinner = 'teamB';
-          else actualWinner = 'draw';
+        if (w.predictedWinner !== actualWinner) continue;
 
-          if (p.predictedWinner !== actualWinner) {
-            allCorrect = false;
-            break;
-          }
-
-          matchesList.push({
-            _id: p.matchId._id,
-            teamA: p.matchId.teamA,
-            teamALogo: p.matchId.teamALogo,
-            teamB: p.matchId.teamB,
-            teamBLogo: p.matchId.teamBLogo,
-            result: p.matchId.result,
-            predictedWinner: p.predictedWinner
-          });
+        let multiplier = 2;
+        if (w.predictedWinner === 'teamA') {
+          multiplier = w.matchId.multiplierTeamA !== undefined ? w.matchId.multiplierTeamA : 2;
+        } else if (w.predictedWinner === 'teamB') {
+          multiplier = w.matchId.multiplierTeamB !== undefined ? w.matchId.multiplierTeamB : 2;
+        } else if (w.predictedWinner === 'draw') {
+          multiplier = w.matchId.multiplierDraw !== undefined ? w.matchId.multiplierDraw : 2;
         }
-
-        if (!allCorrect) continue;
 
         publicWinners.push({
           _id: w._id,
@@ -338,9 +242,9 @@ router.get('/winners', async (req, res) => {
           phoneNumber: maskedPhone,
           predictionType,
           entryAmount,
-          prizeAmount: entryAmount * 2,
-          matches: matchesList,
+          prizeAmount: Math.round(entryAmount * multiplier),
           matchId: w.matchId,
+          predictedWinner: w.predictedWinner,
           createdAt: w.createdAt
         });
       } else {
@@ -352,6 +256,8 @@ router.get('/winners', async (req, res) => {
           continue;
         }
 
+        const scoreMultiplier = w.matchId.multiplierScore !== undefined ? w.matchId.multiplierScore : 3;
+
         publicWinners.push({
           _id: w._id,
           userName: w.userName,
@@ -361,7 +267,7 @@ router.get('/winners', async (req, res) => {
           predictedScoreA: w.predictedScoreA,
           predictedScoreB: w.predictedScoreB,
           entryAmount,
-          prizeAmount: entryAmount * 3,
+          prizeAmount: Math.round(entryAmount * scoreMultiplier),
           matchId: w.matchId,
           createdAt: w.createdAt
         });

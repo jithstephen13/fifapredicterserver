@@ -30,7 +30,21 @@ router.get('/active', async (req, res) => {
 
 // Create a new match (Admin only)
 router.post('/', authenticateAdmin, async (req, res) => {
-  const { teamA, teamB, teamALogo, teamBLogo, kickoffTime, winnerCount, prizeAmount } = req.body;
+  const {
+    teamA,
+    teamB,
+    teamALogo,
+    teamBLogo,
+    kickoffTime,
+    winnerCount,
+    prizeAmount,
+    multiplierTeamA,
+    multiplierTeamB,
+    multiplierDraw,
+    multiplierScore,
+    matchCode,
+    venue
+  } = req.body;
 
   if (!teamA) {
     return res.status(400).json({ error: 'Team A is required' });
@@ -50,7 +64,13 @@ router.post('/', authenticateAdmin, async (req, res) => {
       teamBLogo: teamBLogo || '',
       kickoffTime: new Date(kickoffTime),
       winnerCount: winnerCount || 2,
-      prizeAmount: prizeAmount || 100
+      prizeAmount: prizeAmount || 100,
+      multiplierTeamA: multiplierTeamA !== undefined ? multiplierTeamA : 2,
+      multiplierTeamB: multiplierTeamB !== undefined ? multiplierTeamB : 2,
+      multiplierDraw: multiplierDraw !== undefined ? multiplierDraw : 2,
+      multiplierScore: multiplierScore !== undefined ? multiplierScore : 3,
+      matchCode: matchCode || '',
+      venue: venue || ''
     });
     await match.save();
     res.status(201).json(match);
@@ -61,7 +81,21 @@ router.post('/', authenticateAdmin, async (req, res) => {
 
 // Edit match details (Admin only)
 router.put('/:id', authenticateAdmin, async (req, res) => {
-  const { teamA, teamB, teamALogo, teamBLogo, kickoffTime, winnerCount, prizeAmount } = req.body;
+  const {
+    teamA,
+    teamB,
+    teamALogo,
+    teamBLogo,
+    kickoffTime,
+    winnerCount,
+    prizeAmount,
+    multiplierTeamA,
+    multiplierTeamB,
+    multiplierDraw,
+    multiplierScore,
+    matchCode,
+    venue
+  } = req.body;
 
   try {
     const match = await Match.findById(req.params.id);
@@ -78,8 +112,14 @@ router.put('/:id', authenticateAdmin, async (req, res) => {
     if (teamALogo !== undefined) match.teamALogo = teamALogo;
     if (teamBLogo !== undefined) match.teamBLogo = teamBLogo;
     if (kickoffTime) match.kickoffTime = new Date(kickoffTime);
-    if (winnerCount) match.winnerCount = winnerCount;
-    if (prizeAmount) match.prizeAmount = prizeAmount;
+    if (winnerCount !== undefined) match.winnerCount = winnerCount;
+    if (prizeAmount !== undefined) match.prizeAmount = prizeAmount;
+    if (multiplierTeamA !== undefined) match.multiplierTeamA = multiplierTeamA;
+    if (multiplierTeamB !== undefined) match.multiplierTeamB = multiplierTeamB;
+    if (multiplierDraw !== undefined) match.multiplierDraw = multiplierDraw;
+    if (multiplierScore !== undefined) match.multiplierScore = multiplierScore;
+    if (matchCode !== undefined) match.matchCode = matchCode;
+    if (venue !== undefined) match.venue = venue;
 
     await match.save();
     res.json(match);
@@ -105,6 +145,15 @@ router.post('/:id/complete', authenticateAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Match not found' });
     }
 
+    let previousWinnerName = null;
+    if (match.status === 'completed') {
+      if (match.result.scoreA > match.result.scoreB) {
+        previousWinnerName = match.teamA;
+      } else if (match.result.scoreB > match.result.scoreA) {
+        previousWinnerName = match.teamB;
+      }
+    }
+
     match.status = 'completed';
     match.result = {
       scoreA: parseInt(scoreA),
@@ -113,10 +162,75 @@ router.post('/:id/complete', authenticateAdmin, async (req, res) => {
 
     await match.save();
 
-    // Compute actual winner
-    let actualWinner;
     const sA = parseInt(scoreA);
     const sB = parseInt(scoreB);
+
+    // Auto-propagate winner if matchCode is present
+    if (match.matchCode) {
+      let winnerPlaceholder = '';
+      if (match.matchCode.startsWith('R32-')) {
+        const num = match.matchCode.split('-')[1];
+        winnerPlaceholder = `W-32-${num}`;
+      } else if (match.matchCode.startsWith('R16-')) {
+        const num = match.matchCode.split('-')[1];
+        winnerPlaceholder = `W-16-${num}`;
+      } else if (match.matchCode.startsWith('QF-')) {
+        const num = match.matchCode.split('-')[1];
+        winnerPlaceholder = `W-QF${num}`;
+      } else if (match.matchCode.startsWith('SF-')) {
+        const num = match.matchCode.split('-')[1];
+        winnerPlaceholder = `W-SF${num}`;
+      }
+
+      if (winnerPlaceholder) {
+        let winnerName = '';
+        let winnerLogo = '';
+        if (sA > sB) {
+          winnerName = match.teamA;
+          winnerLogo = match.teamALogo;
+        } else if (sB > sA) {
+          winnerName = match.teamB;
+          winnerLogo = match.teamBLogo;
+        }
+
+        if (winnerName) {
+          // Find any future matches where teamA or teamB is either the placeholder or the previous winner
+          const queryConditions = [
+            { teamA: winnerPlaceholder },
+            { teamB: winnerPlaceholder }
+          ];
+          if (previousWinnerName) {
+            queryConditions.push({ teamA: previousWinnerName });
+            queryConditions.push({ teamB: previousWinnerName });
+          }
+
+          const futureMatches = await Match.find({
+            status: 'scheduled',
+            $or: queryConditions
+          });
+
+          for (const fm of futureMatches) {
+            let updated = false;
+            if (fm.teamA === winnerPlaceholder || fm.teamA === previousWinnerName) {
+              fm.teamA = winnerName;
+              fm.teamALogo = winnerLogo || '🏳️';
+              updated = true;
+            }
+            if (fm.teamB === winnerPlaceholder || fm.teamB === previousWinnerName) {
+              fm.teamB = winnerName;
+              fm.teamBLogo = winnerLogo || '🏳️';
+              updated = true;
+            }
+            if (updated) {
+              await fm.save();
+            }
+          }
+        }
+      }
+    }
+
+    // Compute actual winner
+    let actualWinner;
     if (sA > sB) {
       actualWinner = 'teamA';
     } else if (sA < sB) {
